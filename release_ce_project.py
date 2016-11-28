@@ -29,6 +29,7 @@ binary_excludes = ['imageformats**',
                    'LuaCompiler*',
                    'Editor**'
                    ]
+os.environ['PATH'] = os.environ['PATH'] + os.pathsep + r"C:\Program Files\7-Zip"
 
 
 def copy_directory(source_dir, rel_dir, excludes):
