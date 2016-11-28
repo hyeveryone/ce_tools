@@ -10,6 +10,7 @@ import fnmatch
 engine_path = r'C:\Program Files (x86)\Crytek\CRYENGINE Launcher\Crytek\CRYENGINE_5.1'
 project_path = os.path.join(os.environ['HOMEDRIVE'], os.environ['HOMEPATH'], 'Desktop', 'test1')
 export_path = os.path.join(os.environ['HOMEDRIVE'], os.environ['HOMEPATH'], 'Desktop', 'ce_game')
+dll_name = 'Game.dll'
 
 binary_excludes = ['imageformats**',
                    'ToolkitPro*',
@@ -80,22 +81,29 @@ def copy_levels():
 
 
 def copy_config():
-    """
-    Copy the contents of system.cfg and project.cfg to the exported project's system.cfg.
-    """
-    project_cfg = open(os.path.join(project_path, 'project.cfg')).readlines()
-    system_cfg = open(os.path.join(engine_path, 'system.cfg')).readlines()
-
     with open(os.path.join(export_path, 'system.cfg'), 'w') as fd:
-        fd.writelines(system_cfg)
-        fd.writelines(project_cfg)
+        fd.write('sys_game_folder=Assets\n')
+        fd.write('sys_dll_game={}\n'.format(dll_name))
+
+
+def copy_game_dll():
+    global dll_name
+
+    binpath = os.path.join(project_path, 'bin', 'win_x64')
+    for filename in os.listdir(binpath):
+        if not fnmatch.fnmatch(os.path.join(binpath, filename), '*.dll'):
+            continue
+
+        dll_name = filename
+        shutil.copyfile(os.path.join(binpath, filename),
+                        os.path.join(export_path, 'bin', 'win_x64', filename))
 
 
 copy_directory(engine_path, 'engine', [])
 copy_directory(engine_path, os.path.join('bin', 'win_x64'), binary_excludes)
 
 copy_directory(project_path, 'Assets', ['Levels*'])
-copy_directory(project_path, os.path.join('bin', 'win_x64'), binary_excludes)
 
+copy_game_dll()
 copy_levels()
 copy_config()
