@@ -6,9 +6,12 @@ It does not package the assets into .pak files, it simply collects the files tha
 import os
 import shutil
 import fnmatch
+import subprocess
 
-engine_path = r'C:\Program Files (x86)\Crytek\CRYENGINE Launcher\Crytek\CRYENGINE_5.1'
-project_path = os.path.join(os.environ['HOMEDRIVE'], os.environ['HOMEPATH'], 'Desktop', 'test1')
+engine_version = '5.2'
+engine_path = r'C:\Program Files (x86)\Crytek\CRYENGINE Launcher\Crytek\CRYENGINE_{}'.format(engine_version)
+
+project_path = os.path.join(engine_path, 'Templates', 'cpp', 'RollingBall')
 export_path = os.path.join(os.environ['HOMEDRIVE'], os.environ['HOMEPATH'], 'Desktop', 'ce_game')
 dll_name = 'Game.dll'
 
@@ -80,6 +83,28 @@ def copy_levels():
     return
 
 
+def copy_assets():
+    assetpath = os.path.join(project_path, 'Assets')
+    for itemname in os.listdir(assetpath):
+        itempath = os.path.join(project_path, 'Assets', itemname)
+        if 'evels' in itempath:
+            continue
+
+        if os.path.isfile(itempath):
+            shutil.copyfile(itempath, os.path.join(export_path, 'Assets', itemname))
+        else:
+            zip_cmd = ['7z',
+                       'a',
+                       '-r',
+                       '-tzip',
+                       '-mx0',
+                       os.path.join(export_path, 'Assets', '{}.pak'.format(itemname)),
+                       os.path.join(assetpath, 'Assets', itempath)]
+            print('"{}"'.format(' '.join(zip_cmd)))
+            subprocess.check_call(zip_cmd)
+    return
+
+
 def copy_config():
     with open(os.path.join(export_path, 'system.cfg'), 'w') as fd:
         fd.write('sys_game_folder=Assets\n')
@@ -98,12 +123,12 @@ def copy_game_dll():
         shutil.copyfile(os.path.join(binpath, filename),
                         os.path.join(export_path, 'bin', 'win_x64', filename))
 
-
+# Engine (common) files.
 copy_directory(engine_path, 'engine', [])
 copy_directory(engine_path, os.path.join('bin', 'win_x64'), binary_excludes)
 
-copy_directory(project_path, 'Assets', ['Levels*'])
-
-copy_game_dll()
+# Project-specific files.
+copy_assets()
 copy_levels()
+copy_game_dll()
 copy_config()
