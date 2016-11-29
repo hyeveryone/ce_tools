@@ -8,41 +8,35 @@ import shutil
 import fnmatch
 import subprocess
 
-engine_version = '5.2'
-engine_path = r'C:\Program Files (x86)\Crytek\CRYENGINE Launcher\Crytek\CRYENGINE_{}'.format(engine_version)
-
-project_path = os.path.join(engine_path, 'Templates', 'cpp', 'RollingBall')
-export_path = os.path.join(os.environ['HOMEDRIVE'], os.environ['HOMEPATH'], 'Desktop', 'ce_game')
+os.environ['PATH'] = os.environ['PATH'] + os.pathsep + r"C:\Program Files\7-Zip"
 dll_name = 'Game.dll'
 
-binary_excludes = ['imageformats**',
-                   'ToolkitPro*',
-                   'platforms**',
-                   'Qt*',
-                   'mfc*',
-                   'CryGame*',
-                   'Sandbox*',
-                   'ShaderCacheGen*',
-                   'smpeg2*',
-                   'icu*',
-                   'python27*',
-                   'LuaCompiler*',
-                   'Editor**'
-                   ]
-os.environ['PATH'] = os.environ['PATH'] + os.pathsep + r"C:\Program Files\7-Zip"
 
-
-def copy_directory(source_dir, rel_dir, excludes):
+def copy_engine_binaries(engine_path, export_path, rel_dir):
     """
     Copy a directory to its corresponding location in the export directory.
-    :param source_dir: Current location of the files (project_path or engine_path).
+    :param engine_path: Current location of the files (project_path or engine_path).
+    :param export_path: Path to which the binaries should be exported.
     :param rel_dir: Path of the directory to copy, relative to *source_dir*.
-    :param excludes: List of filename patterns to exclude from the copying procedure (glob format).
     """
     copypaths = []
-    pwd = os.getcwd()
-    os.chdir(source_dir)
 
+    excludes = ['imageformats**',
+                'ToolkitPro*',
+                'platforms**',
+                'Qt*',
+                'mfc*',
+                'CryGame*',
+                'Sandbox*',
+                'ShaderCacheGen*',
+                'smpeg2*',
+                'icu*',
+                'python27*',
+                'LuaCompiler*',
+                'Editor**']
+
+    pwd = os.getcwd()
+    os.chdir(engine_path)
     for root, _, filenames in os.walk(rel_dir):
         for filename in filenames:
             copypaths.append(os.path.normpath(os.path.join(root, filename)))
@@ -58,10 +52,10 @@ def copy_directory(source_dir, rel_dir, excludes):
         destpath = os.path.normpath(os.path.join(export_path, path))
         if not os.path.exists(os.path.dirname(destpath)):
             os.makedirs(os.path.dirname(destpath))
-        shutil.copy(os.path.join(source_dir, path), destpath)
+        shutil.copy(os.path.join(engine_path, path), destpath)
 
 
-def copy_levels():
+def copy_levels(project_path, export_path):
     """
     Copy required level files to the export directory.
     """
@@ -84,11 +78,14 @@ def copy_levels():
     return
 
 
-def copy_assets():
+def package_assets(project_path, export_path):
+    """
+    Create .pak files from the loose assets, which are placed in the exported directory.
+    """
     assetpath = os.path.join(project_path, 'Assets')
     for itemname in os.listdir(assetpath):
         itempath = os.path.join(project_path, 'Assets', itemname)
-        if 'evels' in itempath:
+        if 'levels' in itempath.lower():
             continue
 
         if os.path.isfile(itempath):
@@ -106,17 +103,22 @@ def copy_assets():
     return
 
 
-def copy_config():
+def create_config(export_path):
     with open(os.path.join(export_path, 'system.cfg'), 'w') as fd:
         fd.write('sys_game_folder=Assets\n')
         fd.write('sys_dll_game={}\n'.format(dll_name))
 
 
-def copy_game_dll():
+def copy_game_dll(project_path, export_path):
+    """
+    Search the project's bin/win_x64 directory for a game DLL.
+    When one is found, set this globally (so that it can be added to the system.cfg).
+    """
     global dll_name
 
     binpath = os.path.join(project_path, 'bin', 'win_x64')
     for filename in os.listdir(binpath):
+        # Ignore any .pdb, .ilk, .manifest, or any other files that aren't DLLs.
         if not fnmatch.fnmatch(os.path.join(binpath, filename), '*.dll'):
             continue
 
@@ -124,12 +126,27 @@ def copy_game_dll():
         shutil.copyfile(os.path.join(binpath, filename),
                         os.path.join(export_path, 'bin', 'win_x64', filename))
 
-# Engine (common) files.
-copy_directory(engine_path, 'engine', [])
-copy_directory(engine_path, os.path.join('bin', 'win_x64'), binary_excludes)
 
-# Project-specific files.
-copy_assets()
-copy_levels()
-copy_game_dll()
-copy_config()
+def main():
+    engine_version = '5.2'
+    engine_path = r'C:\Program Files (x86)\Crytek\CRYENGINE Launcher\Crytek\CRYENGINE_{}'.format(engine_version)
+
+    # Path to the project as created by the launcher.
+    project_path = os.path.join(engine_path, 'Templates', 'cpp', 'RollingBall')
+
+    # Path to which the game is to be exported.
+    export_path = os.path.join(os.environ['HOMEDRIVE'], os.environ['HOMEPATH'], 'Desktop', 'ce_game')
+
+    # Copy engine (common) files.
+    shutil.copytree(os.path.join(engine_path, 'engine'), os.path.join(export_path, 'engine'))
+    copy_engine_binaries(engine_path, export_path, os.path.join('bin', 'win_x64'))
+
+    # Copy project-specific files.
+    package_assets(project_path, export_path)
+    copy_levels(project_path, export_path)
+    copy_game_dll(project_path, export_path)
+    create_config(export_path)
+
+
+if __name__ == '__main__':
+    main()
